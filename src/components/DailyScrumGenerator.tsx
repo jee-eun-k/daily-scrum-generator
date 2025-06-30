@@ -377,7 +377,7 @@ export const DailyScrumGenerator = () => {
 		const autoIndicator = task.isAutoInserted ? ' (auto-inserted)' : '';
 		if (task.workItemId?.trim()) {
 			const workItemLink = `https://dev.azure.com/pmi-ap/General/_workitems/edit/${task.workItemId.trim()}`;
-			return `- ${trimmedText} [WI#${task.workItemId}](${workItemLink})${autoIndicator}`;
+			return `- ${trimmedText} [#${task.workItemId}](${workItemLink})${autoIndicator}`;
 		} else {
 			return `- ${trimmedText}${autoIndicator}`;
 		}

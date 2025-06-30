@@ -112,7 +112,7 @@ export class DailyScrumApi {
 
     // Add all entries from each category
     Object.entries(scrumData).forEach(([category, tasks]) => {
-      tasks.forEach((task) => {
+      tasks.forEach((task: ScrumEntry) => {
         if (task.text.trim()) { // Only save non-empty tasks
           entries.push({
             workItemId: task.workItemId?.trim() || undefined,
