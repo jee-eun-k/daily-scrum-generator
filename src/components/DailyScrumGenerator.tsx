@@ -1,10 +1,18 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Copy, User, Plus } from 'lucide-react';
+import { Copy, User, Plus, Calendar, CheckSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { ThemeToggle } from '@/components/theme-toggle';
 import {
 	Card,
 	CardContent,
@@ -54,7 +62,7 @@ export const DailyScrumGenerator = () => {
 			weeklyTasks.push({
 				id: 'weekly-report-' + crypto.randomUUID(),
 				text: '주간 리포트 작성',
-				isAutoInserted: true
+				isAutoInserted: true,
 			});
 		}
 
@@ -63,7 +71,7 @@ export const DailyScrumGenerator = () => {
 			weeklyTasks.push({
 				id: 'weekly-meeting-' + crypto.randomUUID(),
 				text: '주간 리포트 미팅',
-				isAutoInserted: true
+				isAutoInserted: true,
 			});
 		}
 
@@ -75,10 +83,10 @@ export const DailyScrumGenerator = () => {
 		const weeklyTasks = getWeeklyTasks();
 		if (weeklyTasks.length > 0) {
 			// Check if weekly tasks are already added to avoid duplicates
-			const hasAutoTasks = todayTasks.some(task => task.isAutoInserted);
+			const hasAutoTasks = todayTasks.some((task) => task.isAutoInserted);
 			if (!hasAutoTasks) {
-				setTodayTasks(prev => [...prev, ...weeklyTasks]);
-				const taskNames = weeklyTasks.map(t => t.text).join(', ');
+				setTodayTasks((prev) => [...prev, ...weeklyTasks]);
+				const taskNames = weeklyTasks.map((t) => t.text).join(', ');
 				showToast(
 					'주간 업무 자동 추가',
 					`오늘의 주간 업무가 자동으로 추가되었습니다: ${taskNames}`,
@@ -109,64 +117,20 @@ export const DailyScrumGenerator = () => {
 		[yesterdayTasks, todayTasks, impedimentTasks, laterTasks]
 	);
 
-	// Load data from localStorage on component mount
-	useEffect(() => {
-		const loadData = () => {
-			try {
-				const savedData = localStorage.getItem('scrumData');
-				if (savedData) {
-					const data = JSON.parse(savedData);
-					setUserId(data.userId || '');
-					setYesterdayTasks(data.yesterday || []);
-					setTodayTasks(data.today || []);
-					setImpedimentTasks(data.impediments || []);
-					setLaterTasks(data.later || []);
-					if (
-						data.yesterday?.length > 0 ||
-						data.today?.length > 0 ||
-						data.impediments?.length > 0 ||
-						data.later?.length > 0
-					) {
-						showToast(
-							'데이터 불러오기 완료',
-							'이전 스크럼 데이터가 로드되었습니다.',
-							'success'
-						);
-					}
-				}
-			} catch (error) {
-				console.error('Error loading data from localStorage:', error);
-			}
-		};
-
-		loadData();
-	}, [showToast]);
-
-
-	// Save data to API and localStorage (debounced)
+	// Save data to API (debounced)
 	useEffect(() => {
 		if (!isReady || !userId.trim()) return;
 
 		const handler = setTimeout(async () => {
 			try {
-				// Save to localStorage for backup
-				const localData = {
-					userId,
+				// Save to API
+				const scrumData: ScrumData = {
 					yesterday: yesterdayTasks,
 					today: todayTasks,
 					impediments: impedimentTasks,
 					later: laterTasks,
 				};
-				localStorage.setItem('scrumData', JSON.stringify(localData));
 
-				// Save to API if user ID is provided
-				const scrumData: ScrumData = {
-					yesterday: yesterdayTasks,
-					today: todayTasks,
-					impediments: impedimentTasks,
-					later: laterTasks
-				};
-				
 				await DailyScrumApi.saveUserData(userId, scrumData);
 			} catch (error) {
 				console.error('Error saving data:', error);
@@ -179,7 +143,15 @@ export const DailyScrumGenerator = () => {
 		}, 1000); // Debounce by 1 second
 
 		return () => clearTimeout(handler);
-	}, [userId, yesterdayTasks, todayTasks, impedimentTasks, laterTasks, isReady, showToast]);
+	}, [
+		userId,
+		yesterdayTasks,
+		todayTasks,
+		impedimentTasks,
+		laterTasks,
+		isReady,
+		showToast,
+	]);
 
 	// Add a new empty task to a specific section
 	const addTask = useCallback(
@@ -304,7 +276,9 @@ export const DailyScrumGenerator = () => {
 				if (targetId === undefined) {
 					updatedTargetTasks.push(movedItem);
 				} else {
-					const targetIndex = updatedTargetTasks.findIndex((task) => task.id === targetId);
+					const targetIndex = updatedTargetTasks.findIndex(
+						(task) => task.id === targetId
+					);
 					if (targetIndex === -1) {
 						updatedTargetTasks.push(movedItem);
 					} else {
@@ -334,32 +308,44 @@ export const DailyScrumGenerator = () => {
 		try {
 			// Try to load user's current data first
 			const currentData = await DailyScrumApi.loadUserData(userId);
-			
+
 			// Check if user has any current data
-			const hasCurrentData = Object.values(currentData).some(tasks => tasks.length > 0);
-			
+			const hasCurrentData = Object.values(currentData).some((tasks) => tasks.length > 0);
+
 			if (hasCurrentData) {
 				// Load current day's data
 				setYesterdayTasks(currentData.yesterday);
 				setTodayTasks(currentData.today);
 				setImpedimentTasks(currentData.impediments);
 				setLaterTasks(currentData.later);
-				showToast('데이터 로드 완료', `${userId}의 오늘 데이터를 로드했습니다.`, 'success');
+				showToast(
+					'데이터 로드 완료',
+					`${userId}의 오늘 데이터를 로드했습니다.`,
+					'success'
+				);
 			} else {
 				// Try to load previous day's data
 				try {
 					const previousData = await DailyScrumApi.loadPreviousData(userId);
-					
+
 					// Move previous "today" tasks to "yesterday"
 					setYesterdayTasks(previousData.today);
 					setTodayTasks([]);
 					setImpedimentTasks([]);
 					setLaterTasks(previousData.later); // Keep later tasks
-					
+
 					if (previousData.today.length > 0) {
-						showToast('이전 데이터 적용', `${userId}의 이전 "오늘 할 일"이 "어제 한 일"로 이동되었습니다.`, 'success');
+						showToast(
+							'이전 데이터 적용',
+							`${userId}의 이전 "오늘 할 일"이 "어제 한 일"로 이동되었습니다.`,
+							'success'
+						);
 					} else {
-						showToast('데이터 없음', `${userId}에 대한 이전 데이터를 찾을 수 없습니다.`, 'default');
+						showToast(
+							'데이터 없음',
+							`${userId}에 대한 이전 데이터를 찾을 수 없습니다.`,
+							'default'
+						);
 					}
 				} catch {
 					showToast('새 사용자', `${userId}를 위한 새 스크럼을 시작합니다.`, 'default');
@@ -387,7 +373,7 @@ export const DailyScrumGenerator = () => {
 	const formatTaskWithLink = useCallback((task: ExtendedTask) => {
 		const trimmedText = task.text.trim();
 		if (!trimmedText) return '';
-		
+
 		const autoIndicator = task.isAutoInserted ? ' (auto-inserted)' : '';
 		if (task.workItemId?.trim()) {
 			const workItemLink = `https://dev.azure.com/pmi-ap/General/_workitems/edit/${task.workItemId.trim()}`;
@@ -402,14 +388,14 @@ export const DailyScrumGenerator = () => {
 		const currentDate = new Date();
 		// Format: YYYY-MM-DD
 		const dateString = currentDate.toISOString().split('T')[0];
-		
+
 		// User ID display (fallback to 'Anonymous' if empty)
 		const displayUserId = userId.trim() || 'Anonymous';
 
 		let scrumText = `📅 ${dateString} Daily Scrum - [${displayUserId}]\n\n`;
 
 		if (yesterdayTasks.length > 0) {
-			scrumText += '✅ Yesterday:\n';
+			scrumText += '✅ Done:\n';
 			yesterdayTasks.forEach((task) => {
 				const formattedTask = formatTaskWithLink(task);
 				if (formattedTask) {
@@ -420,7 +406,7 @@ export const DailyScrumGenerator = () => {
 		}
 
 		if (todayTasks.length > 0) {
-			scrumText += '📋 Today:\n';
+			scrumText += '📋 Todo:\n';
 			todayTasks.forEach((task) => {
 				const formattedTask = formatTaskWithLink(task);
 				if (formattedTask) {
@@ -442,7 +428,7 @@ export const DailyScrumGenerator = () => {
 		}
 
 		if (laterTasks.length > 0) {
-			scrumText += '📝 Later:\n';
+			scrumText += '📝 Upcoming:\n';
 			laterTasks.forEach((task) => {
 				const formattedTask = formatTaskWithLink(task);
 				if (formattedTask) {
@@ -462,8 +448,16 @@ export const DailyScrumGenerator = () => {
 		}
 
 		setGeneratedScrum(scrumText.trim());
-		showToast('스크럼 생성 완료!', '일일 스크럼 업데이트가 준비되었습니다.', 'success');
-	}, [userId, yesterdayTasks, todayTasks, impedimentTasks, laterTasks, formatTaskWithLink, showToast]);
+		showToast('스크럼 생성 완료!', '데일리 스크럼 업데이트가 준비되었습니다.', 'success');
+	}, [
+		userId,
+		yesterdayTasks,
+		todayTasks,
+		impedimentTasks,
+		laterTasks,
+		formatTaskWithLink,
+		showToast,
+	]);
 
 	// Function to copy text to clipboard
 	const copyToClipboard = useCallback(async () => {
@@ -497,201 +491,225 @@ export const DailyScrumGenerator = () => {
 	}, [generatedScrum, showToast]);
 
 	return (
-		<div className='min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 flex items-center justify-center p-4'>
-			<Card className='w-full max-w-2xl mx-auto rounded-xl shadow-lg'>
-				<CardHeader>
-					<CardTitle>일일 스크럼 생성기</CardTitle>
-					<CardDescription>빠르게 일일 스크럼 업데이트를 생성하세요.</CardDescription>
-				</CardHeader>
-				<CardContent className='grid gap-6'>
-					{/* 사용자 ID 입력 섹션 */}
-					<div className='grid gap-2'>
-						<Label htmlFor='user-id'>사용자 ID:</Label>
-						<div className='flex gap-2'>
-							<div className='relative flex-1'>
-								<User className='absolute left-3 top-3 h-4 w-4 text-muted-foreground' />
-								<Input
-									id='user-id'
-									type='text'
-									placeholder='사용자 ID를 입력하세요'
-									value={userId}
-									onChange={(e) => setUserId(e.target.value)}
-									className='pl-10'
-								/>
+		<TooltipProvider>
+			<div className='min-h-screen bg-background flex items-center justify-center p-4'>
+				<Card className='w-full max-w-2xl mx-auto'>
+					<CardHeader>
+						<div className='flex items-center justify-between'>
+							<div className='flex items-center gap-2'>
+								<Calendar className='h-5 w-5 text-primary' />
+								<CardTitle>데일리 스크럼 생성기</CardTitle>
 							</div>
-							<Button
-								onClick={loadPreviousData}
-								disabled={!userId.trim() || isLoadingData}
-								variant='outline'
-							>
-								{isLoadingData ? '로딩중...' : '이전 데이터 불러오기'}
-							</Button>
+							<ThemeToggle />
 						</div>
-					</div>
-	
-					{/* 어제 한 일 섹션 */}
-					<div
-						className='grid gap-2'
-						onDragOver={handleDragOver}
-						onDrop={(e) => handleDrop(e, 'yesterday')}
-					>
-						<div className='flex items-center justify-between'>
-							<Label htmlFor='yesterday-tasks'>어제 한 일:</Label>
-							<Button
-								onClick={() => addTask('yesterday')}
-								variant='ghost'
-								size='sm'
-								className='h-6 px-2 text-xs text-gray-500 hover:text-gray-700'
-							>
-								<Plus className='h-3 w-3 mr-1' />
-								추가
-							</Button>
-						</div>
-						{yesterdayTasks.map((task) => (
-							<TaskItem
-								key={task.id}
-								task={task}
-								section='yesterday'
-								onUpdateText={updateTaskText}
-								onUpdateWorkItemId={updateTaskWorkItemId}
-								onRemove={removeTask}
-								onDragStart={handleDragStart}
-								onDragOver={handleDragOver}
-								onDrop={handleDrop}
-							/>
-						))}
-					</div>
-
-					{/* 오늘 할 일 섹션 */}
-					<div
-						className='grid gap-2'
-						onDragOver={handleDragOver}
-						onDrop={(e) => handleDrop(e, 'today')}
-					>
-						<div className='flex items-center justify-between'>
-							<Label htmlFor='today-tasks'>오늘 할 일:</Label>
-							<Button
-								onClick={() => addTask('today')}
-								variant='ghost'
-								size='sm'
-								className='h-6 px-2 text-xs text-gray-500 hover:text-gray-700'
-							>
-								<Plus className='h-3 w-3 mr-1' />
-								추가
-							</Button>
-						</div>
-						{todayTasks.map((task) => (
-							<TaskItem
-								key={task.id}
-								task={task}
-								section='today'
-								onUpdateText={updateTaskText}
-								onUpdateWorkItemId={updateTaskWorkItemId}
-								onRemove={removeTask}
-								onDragStart={handleDragStart}
-								onDragOver={handleDragOver}
-								onDrop={handleDrop}
-							/>
-						))}
-					</div>
-
-					{/* 방해 요소 섹션 */}
-					<div
-						className='grid gap-2'
-						onDragOver={handleDragOver}
-						onDrop={(e) => handleDrop(e, 'impediments')}
-					>
-						<div className='flex items-center justify-between'>
-							<Label htmlFor='impediments-tasks'>방해 요소:</Label>
-							<Button
-								onClick={() => addTask('impediments')}
-								variant='ghost'
-								size='sm'
-								className='h-6 px-2 text-xs text-gray-500 hover:text-gray-700'
-							>
-								<Plus className='h-3 w-3 mr-1' />
-								추가
-							</Button>
-						</div>
-						{impedimentTasks.map((task) => (
-							<TaskItem
-								key={task.id}
-								task={task}
-								section='impediments'
-								onUpdateText={updateTaskText}
-								onUpdateWorkItemId={updateTaskWorkItemId}
-								onRemove={removeTask}
-								onDragStart={handleDragStart}
-								onDragOver={handleDragOver}
-								onDrop={handleDrop}
-							/>
-						))}
-					</div>
-
-					{/* 나중에 할 일 섹션 */}
-					<div
-						className='grid gap-2'
-						onDragOver={handleDragOver}
-						onDrop={(e) => handleDrop(e, 'later')}
-					>
-						<div className='flex items-center justify-between'>
-							<Label htmlFor='later-tasks'>나중에 할 일:</Label>
-							<Button
-								onClick={() => addTask('later')}
-								variant='ghost'
-								size='sm'
-								className='h-6 px-2 text-xs text-gray-500 hover:text-gray-700'
-							>
-								<Plus className='h-3 w-3 mr-1' />
-								추가
-							</Button>
-						</div>
-						{laterTasks.map((task) => (
-							<TaskItem
-								key={task.id}
-								task={task}
-								section='later'
-								onUpdateText={updateTaskText}
-								onUpdateWorkItemId={updateTaskWorkItemId}
-								onRemove={removeTask}
-								onDragStart={handleDragStart}
-								onDragOver={handleDragOver}
-								onDrop={handleDrop}
-							/>
-						))}
-					</div>
-
-					<div className='flex gap-2 mt-4'>
-						<Button onClick={clearAllData} variant='outline' className='flex-1'>
-							모두 지우기
-						</Button>
-					</div>
-
-					<Button onClick={generateScrum} className='w-full mt-4'>
-						스크럼 생성
-					</Button>
-				</CardContent>
-				{generatedScrum && (
-					<CardFooter className='flex flex-col items-start gap-4'>
-						<div className='w-full'>
-							<Label>일일 스크럼 업데이트 (클릭해서 복사):</Label>
-							<div className='relative mt-2 p-4 bg-muted rounded-md border border-border text-sm whitespace-pre-wrap font-mono'>
-								{generatedScrum}
+						<CardDescription>빠르게 데일리 스크럼 업데이트를 생성하세요.</CardDescription>
+					</CardHeader>
+					<CardContent className='grid gap-6'>
+						{/* 사용자 ID 입력 섹션 */}
+						<div className='grid gap-2'>
+							<Label htmlFor='user-id'>사용자 ID:</Label>
+							<div className='flex gap-2'>
+								<div className='relative flex-1'>
+									<User className='absolute left-3 top-3 h-4 w-4 text-muted-foreground' />
+									<Input
+										id='user-id'
+										type='text'
+										placeholder='사용자 ID를 입력하세요'
+										value={userId}
+										onChange={(e) => setUserId(e.target.value)}
+										className='pl-10'
+									/>
+								</div>
 								<Button
-									variant='ghost'
-									size='icon'
-									className='absolute top-2 right-2 hover:bg-accent'
-									onClick={copyToClipboard}
-									title='클립보드에 복사'
+									onClick={loadPreviousData}
+									disabled={!userId.trim() || isLoadingData}
+									variant='outline'
 								>
-									<Copy className='h-4 w-4' />
+									{isLoadingData ? '로딩중...' : '이전 데이터 불러오기'}
 								</Button>
 							</div>
 						</div>
-					</CardFooter>
-				)}
-			</Card>
-			<Toaster toasts={toasts} />
-		</div>
+
+						{/* 어제 한 일 섹션 */}
+						<div
+							className='grid gap-3'
+							onDragOver={handleDragOver}
+							onDrop={(e) => handleDrop(e, 'yesterday')}
+						>
+							<div className='flex items-center justify-between'>
+								<div className='flex items-center gap-2'>
+									<CheckSquare className='h-4 w-4 text-green-600' />
+									<Label htmlFor='yesterday-tasks' className='text-base font-medium'>
+										어제 한 일
+									</Label>
+									<Badge variant='secondary' className='text-xs'>
+										{yesterdayTasks.length}
+									</Badge>
+								</div>
+								<Tooltip>
+									<TooltipTrigger asChild>
+										<Button
+											onClick={() => addTask('yesterday')}
+											variant='ghost'
+											size='sm'
+											className='h-8 px-2'
+										>
+											<Plus className='w-4 h-4' />
+										</Button>
+									</TooltipTrigger>
+									<TooltipContent>
+										<p>새 작업 추가</p>
+									</TooltipContent>
+								</Tooltip>
+							</div>
+							<div className='space-y-2'>
+								{yesterdayTasks.map((task) => (
+									<TaskItem
+										key={task.id}
+										task={task}
+										section='yesterday'
+										onUpdateText={updateTaskText}
+										onUpdateWorkItemId={updateTaskWorkItemId}
+										onRemove={removeTask}
+										onDragStart={handleDragStart}
+										onDragOver={handleDragOver}
+										onDrop={handleDrop}
+									/>
+								))}
+							</div>
+						</div>
+
+						{/* 오늘 할 일 섹션 */}
+						<div
+							className='grid gap-2'
+							onDragOver={handleDragOver}
+							onDrop={(e) => handleDrop(e, 'today')}
+						>
+							<div className='flex items-center justify-between'>
+								<Label htmlFor='today-tasks'>오늘 할 일:</Label>
+								<Button
+									onClick={() => addTask('today')}
+									variant='ghost'
+									size='sm'
+									className='h-6 px-2 text-xs text-gray-500 hover:text-gray-700'
+								>
+									<Plus className='h-3 w-3 mr-1' />
+									추가
+								</Button>
+							</div>
+							{todayTasks.map((task) => (
+								<TaskItem
+									key={task.id}
+									task={task}
+									section='today'
+									onUpdateText={updateTaskText}
+									onUpdateWorkItemId={updateTaskWorkItemId}
+									onRemove={removeTask}
+									onDragStart={handleDragStart}
+									onDragOver={handleDragOver}
+									onDrop={handleDrop}
+								/>
+							))}
+						</div>
+
+						{/* 방해 요소 섹션 */}
+						<div
+							className='grid gap-2'
+							onDragOver={handleDragOver}
+							onDrop={(e) => handleDrop(e, 'impediments')}
+						>
+							<div className='flex items-center justify-between'>
+								<Label htmlFor='impediments-tasks'>방해 요소:</Label>
+								<Button
+									onClick={() => addTask('impediments')}
+									variant='ghost'
+									size='sm'
+									className='h-6 px-2 text-xs text-gray-500 hover:text-gray-700'
+								>
+									<Plus className='h-3 w-3 mr-1' />
+									추가
+								</Button>
+							</div>
+							{impedimentTasks.map((task) => (
+								<TaskItem
+									key={task.id}
+									task={task}
+									section='impediments'
+									onUpdateText={updateTaskText}
+									onUpdateWorkItemId={updateTaskWorkItemId}
+									onRemove={removeTask}
+									onDragStart={handleDragStart}
+									onDragOver={handleDragOver}
+									onDrop={handleDrop}
+								/>
+							))}
+						</div>
+
+						{/* 나중에 할 일 섹션 */}
+						<div
+							className='grid gap-2'
+							onDragOver={handleDragOver}
+							onDrop={(e) => handleDrop(e, 'later')}
+						>
+							<div className='flex items-center justify-between'>
+								<Label htmlFor='later-tasks'>나중에 할 일:</Label>
+								<Button
+									onClick={() => addTask('later')}
+									variant='ghost'
+									size='sm'
+									className='h-6 px-2 text-xs text-gray-500 hover:text-gray-700'
+								>
+									<Plus className='h-3 w-3 mr-1' />
+									추가
+								</Button>
+							</div>
+							{laterTasks.map((task) => (
+								<TaskItem
+									key={task.id}
+									task={task}
+									section='later'
+									onUpdateText={updateTaskText}
+									onUpdateWorkItemId={updateTaskWorkItemId}
+									onRemove={removeTask}
+									onDragStart={handleDragStart}
+									onDragOver={handleDragOver}
+									onDrop={handleDrop}
+								/>
+							))}
+						</div>
+
+						<div className='flex gap-2 mt-4'>
+							<Button onClick={clearAllData} variant='outline' className='flex-1'>
+								모두 지우기
+							</Button>
+						</div>
+
+						<Button onClick={generateScrum} className='w-full mt-4'>
+							스크럼 생성
+						</Button>
+					</CardContent>
+					{generatedScrum && (
+						<CardFooter className='flex flex-col items-start gap-4'>
+							<div className='w-full'>
+								<Label>데일리 스크럼 업데이트:</Label>
+								<div className='relative mt-2 p-4 bg-muted rounded-md border border-border text-sm whitespace-pre-wrap font-mono'>
+									{generatedScrum}
+									<Button
+										variant='ghost'
+										size='icon'
+										className='absolute top-2 right-2 hover:bg-accent'
+										onClick={copyToClipboard}
+										title='클립보드에 복사'
+									>
+										<Copy className='h-4 w-4' />
+									</Button>
+								</div>
+							</div>
+						</CardFooter>
+					)}
+				</Card>
+				<Toaster toasts={toasts} />
+			</div>
+		</TooltipProvider>
 	);
 };
